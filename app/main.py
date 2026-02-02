@@ -133,9 +133,9 @@ class ScoopClient:
 
         rows = self._parse_scoop_list_json(out)
         if rows is None:
-            rows = self._parse_scoop_list_text(out)
-        if rows is None:
-            self.ui.plainTextEditLog.appendPlainText("[error] failed to parse scoop output")
+            self.ui.plainTextEditLog.appendPlainText(
+                "[error] failed to parse scoop export json"
+            )
             return
 
         # モデル更新
@@ -182,7 +182,7 @@ class ScoopClient:
             if ch not in "{[":
                 continue
             try:
-                value, _ = decoder.raw_decode(text[i:])
+                value, _ = decoder.raw_decode(text, i)
                 return value
             except json.JSONDecodeError:
                 continue
@@ -203,17 +203,11 @@ class ScoopClient:
         if data is None:
             return None
 
-        if isinstance(data, dict) and isinstance(data.get("apps"), list):
-            items = data["apps"]
-        elif isinstance(data, dict):
-            items = [data]
-        elif isinstance(data, list):
-            items = data
-        else:
+        if not (isinstance(data, dict) and isinstance(data.get("apps"), list)):
             return None
 
         rows = []
-        for item in items:
+        for item in data["apps"]:
             if not isinstance(item, dict):
                 continue
             name = str(item.get("Name", ""))
@@ -224,7 +218,7 @@ class ScoopClient:
 
             updated = updated_raw[:19].replace("T", " ") if len(updated_raw) >= 19 else updated_raw
             rows.append((name, ver, source, updated, info))
-        return rows or None
+        return rows
 
     @staticmethod
     def _parse_scoop_list_text(text: str):
