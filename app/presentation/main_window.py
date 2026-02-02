@@ -47,6 +47,11 @@ class MainWindow(QMainWindow):
         self.scoop.error.connect(self.ui.plainTextEditLog.appendPlainText)
         self.scoop.loaded.connect(self.on_packages_loaded)
 
+        self.ui.pushButtonRefresh.clicked.connect(self.scoop.refresh_installed_apps)
+        self.ui.pushButtonUninstall.clicked.connect(self.on_uninstall_clicked)
+        self.ui.pushButtonUpdate.clicked.connect(self.on_update_clicked)
+        self.ui.pushButtonCleanup.clicked.connect(self.on_cleanup_clicked)
+
         QTimer.singleShot(0, self.scoop.refresh_installed_apps)
 
     def _polish_table(self) -> None:
@@ -124,3 +129,43 @@ class MainWindow(QMainWindow):
         name = self.model.item(src.row(), 0).text()
         ver = self.model.item(src.row(), 1).text()
         self.set_details(name, ver)
+
+    def _selected_app_name(self) -> str | None:
+        """Returns the currently selected app name, if any."""
+        current = self.ui.tableViewPackages.currentIndex()
+        if not current.isValid():
+            return None
+
+        src = self.proxy.mapToSource(current)
+        item = self.model.item(src.row(), 0)
+        if item is None:
+            return None
+
+        name = item.text().strip()
+        return name or None
+
+    def _require_selection(self, action: str) -> str | None:
+        """Returns the selected app name or logs a hint message."""
+        name = self._selected_app_name()
+        if not name:
+            self.scoop.log.emit(f"[info] select a package to {action}")
+            return None
+        return name
+
+    def on_uninstall_clicked(self) -> None:
+        """Runs scoop uninstall for the selected app."""
+        name = self._require_selection("uninstall")
+        if not name:
+            return
+        self.scoop.uninstall_app(name)
+
+    def on_update_clicked(self) -> None:
+        """Runs scoop update for the selected app."""
+        name = self._require_selection("update")
+        if not name:
+            return
+        self.scoop.update_app(name)
+
+    def on_cleanup_clicked(self) -> None:
+        """Runs scoop cleanup for all apps."""
+        self.scoop.cleanup_all()
