@@ -47,11 +47,14 @@ class ScoopClient:
             self.ui.plainTextEditLog.appendPlainText("[info] already running")
             return
 
-        self.ui.plainTextEditLog.appendPlainText("$ scoop list")
+        self.ui.plainTextEditLog.appendPlainText("$ scoop export")
         self.ui.plainTextEditLog.appendPlainText("[running] ...")
 
         shell = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
-        cmd = "scoop list 6> $null | ConvertTo-Json -Compress"
+        # scoop export は最初から JSON（buckets/apps）を出力するので、テキスト解析より安定する
+        # PowerShell の情報ストリームは 6> $null で抑制
+        # exit $LASTEXITCODE で scoop の終了コードを PowerShell の終了コードに反映
+        cmd = "$ErrorActionPreference='Stop'; scoop export 6> $null; exit $LASTEXITCODE"
 
         thread = QThread()
         worker = _ScoopListWorker(shell, cmd)
@@ -85,9 +88,16 @@ class ScoopClient:
         if err.strip():
             self.ui.plainTextEditLog.appendPlainText(err.rstrip())
 
+        if returncode != 0:
+            self.ui.plainTextEditLog.appendPlainText(f"[error] scoop failed (code={returncode})")
+            return
+
         rows = self._parse_scoop_list_json(out)
         if rows is None:
             rows = self._parse_scoop_list_text(out)
+        if not rows:
+            self.ui.plainTextEditLog.appendPlainText("[error] failed to parse scoop output")
+            return
 
         # モデル更新
         self.model.removeRows(0, self.model.rowCount())
@@ -112,9 +122,11 @@ class ScoopClient:
 
     @staticmethod
     def _parse_scoop_list_json(text: str):
-        json_start = text.find("[")
+        # scoop export は { "buckets": [...], "apps": [...] } 形式
+        json_start = text.find("{")
         if json_start == -1:
-            json_start = text.find("{")
+            # 互換用（念のため）
+            json_start = text.find("[")
         if json_start == -1:
             return None
 
@@ -123,7 +135,9 @@ class ScoopClient:
         except json.JSONDecodeError:
             return None
 
-        if isinstance(data, dict):
+        if isinstance(data, dict) and isinstance(data.get("apps"), list):
+            items = data["apps"]
+        elif isinstance(data, dict):
             items = [data]
         elif isinstance(data, list):
             items = data
@@ -142,7 +156,7 @@ class ScoopClient:
 
             updated = updated_raw[:19].replace("T", " ") if len(updated_raw) >= 19 else updated_raw
             rows.append((name, ver, source, updated, info))
-        return rows
+        return rows or None
 
     @staticmethod
     def _parse_scoop_list_text(text: str):
