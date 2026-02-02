@@ -1,0 +1,19 @@
+[workspace]
+authors = ["mori5600 <211203777+mori5600@users.noreply.github.com>"]
+channels = ["conda-forge"]
+name = "scoop-gui"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+app = "python -m app.main"
+designer = "pyside6-designer"
+uic-all = "pwsh -NoProfile -ExecutionPolicy Bypass -File pwsh/ui2py.ps1"
+format = "ruff check --fix app && ruff format app"
+
+[dependencies]
+python = "3.12.*"
+ruff = ">=0.14.14,<0.15"
+
+[pypi-dependencies]
+pyside6 = { version = "==6.10.1" }
