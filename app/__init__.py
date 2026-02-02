@@ -1,0 +1,1 @@
+"""Scoop GUI application package."""
