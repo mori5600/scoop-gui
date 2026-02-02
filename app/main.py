@@ -14,21 +14,33 @@ except ImportError:
 
 
 class _ScoopListWorker(QObject):
+    """Runs Scoop commands in a background thread and returns raw output."""
+
     finished = Signal(bytes, bytes, int)
 
     def __init__(self, shell: str, command: str):
+        """Initializes the worker.
+
+        Args:
+            shell: PowerShell executable path (e.g. `pwsh` or `powershell`).
+            command: PowerShell command string to execute.
+        """
         super().__init__()
         self._shell = shell
         self._command = command
 
     @Slot()
     def run(self):
+        """Executes the configured PowerShell command."""
         try:
             result = subprocess.run(
                 [self._shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", self._command],
                 capture_output=True,
+                timeout=60,
             )
             self.finished.emit(result.stdout, result.stderr, result.returncode)
+        except subprocess.TimeoutExpired:
+            self.finished.emit(b"", b"timeout: scoop command exceeded 60 seconds", 124)
         except Exception as e:
             self.finished.emit(b"", str(e).encode("utf-8", errors="replace"), 1)
 
@@ -41,11 +53,15 @@ class ScoopClient:
 
         self._thread: QThread | None = None
         self._worker: _ScoopListWorker | None = None
+        self._active_job_id = 0
 
     def refresh_list(self):
-        if self._thread is not None and self._thread.isRunning():
+        if self._thread is not None:
             self.ui.plainTextEditLog.appendPlainText("[info] already running")
             return
+
+        self._active_job_id += 1
+        job_id = self._active_job_id
 
         self.ui.plainTextEditLog.appendPlainText("$ scoop export")
         self.ui.plainTextEditLog.appendPlainText("[running] ...")
@@ -60,21 +76,33 @@ class ScoopClient:
         worker = _ScoopListWorker(shell, cmd)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.finished.connect(self._finished)
+        worker.finished.connect(
+            lambda stdout, stderr, returncode, jid=job_id: self._finished(jid, stdout, stderr, returncode)
+        )
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(self._thread_finished)
+        thread.finished.connect(lambda t=thread: self._thread_finished(t))
         self._thread = thread
         self._worker = worker
         thread.start()
 
-    def _thread_finished(self):
-        self._thread = None
-        self._worker = None
+    def _thread_finished(self, finished_thread: QThread):
+        """Clears references only if the finished thread is still the active one."""
+        if self._thread is finished_thread:
+            self._thread = None
+            self._worker = None
 
     @staticmethod
     def _decode(data: bytes) -> str:
+        """Decodes process output bytes with a small encoding fallback list.
+
+        Args:
+            data: Raw bytes to decode.
+
+        Returns:
+            Decoded text.
+        """
         for enc in ("utf-8", "cp932"):
             try:
                 return data.decode(enc)
@@ -82,7 +110,18 @@ class ScoopClient:
                 continue
         return data.decode("utf-8", errors="replace")
 
-    def _finished(self, stdout: bytes, stderr: bytes, returncode: int):
+    def _finished(self, job_id: int, stdout: bytes, stderr: bytes, returncode: int):
+        """Handles a finished Scoop job.
+
+        Args:
+            job_id: Monotonic identifier used to ignore stale results.
+            stdout: Raw stdout bytes.
+            stderr: Raw stderr bytes.
+            returncode: Process return code.
+        """
+        if job_id != self._active_job_id:
+            return
+
         out = self._decode(stdout)
         err = self._decode(stderr)
         if err.strip():
@@ -95,12 +134,16 @@ class ScoopClient:
         rows = self._parse_scoop_list_json(out)
         if rows is None:
             rows = self._parse_scoop_list_text(out)
-        if not rows:
+        if rows is None:
             self.ui.plainTextEditLog.appendPlainText("[error] failed to parse scoop output")
             return
 
         # モデル更新
-        self.model.removeRows(0, self.model.rowCount())
+        tv = self.ui.tableViewPackages
+        sorting_was_enabled = tv.isSortingEnabled()
+        tv.setSortingEnabled(False)
+
+        self.model.setRowCount(0)
         for name, ver, source, updated, info in rows:
             self.model.appendRow(
                 [
@@ -113,6 +156,7 @@ class ScoopClient:
             )
 
         self.ui.tableViewPackages.resizeColumnsToContents()
+        tv.setSortingEnabled(sorting_was_enabled)
         self.ui.plainTextEditLog.appendPlainText(f"[loaded] {len(rows)} packages")
 
         # 先頭を選択（任意）
@@ -121,18 +165,42 @@ class ScoopClient:
             self.ui.tableViewPackages.setCurrentIndex(idx)
 
     @staticmethod
-    def _parse_scoop_list_json(text: str):
-        # scoop export は { "buckets": [...], "apps": [...] } 形式
-        json_start = text.find("{")
-        if json_start == -1:
-            # 互換用（念のため）
-            json_start = text.find("[")
-        if json_start == -1:
-            return None
+    def _extract_first_json_value(text: str):
+        """Extracts the first JSON value from a noisy text stream.
 
-        try:
-            data = json.loads(text[json_start:])
-        except json.JSONDecodeError:
+        This is tolerant to non-JSON prefixes (e.g. banner/log lines). It attempts to
+        decode JSON starting at each '{' or '[' occurrence.
+
+        Args:
+            text: Text that may contain a JSON value.
+
+        Returns:
+            A Python object parsed from the first JSON value, or None if not found.
+        """
+        decoder = json.JSONDecoder()
+        for i, ch in enumerate(text):
+            if ch not in "{[":
+                continue
+            try:
+                value, _ = decoder.raw_decode(text[i:])
+                return value
+            except json.JSONDecodeError:
+                continue
+        return None
+
+    @staticmethod
+    def _parse_scoop_list_json(text: str):
+        """Parses `scoop export` JSON output into table rows.
+
+        Args:
+            text: `scoop export` stdout text (may contain extra non-JSON lines).
+
+        Returns:
+            List of rows as tuples `(name, version, source, updated, info)`, or None if
+            the JSON cannot be parsed.
+        """
+        data = ScoopClient._extract_first_json_value(text)
+        if data is None:
             return None
 
         if isinstance(data, dict) and isinstance(data.get("apps"), list):
@@ -160,9 +228,16 @@ class ScoopClient:
 
     @staticmethod
     def _parse_scoop_list_text(text: str):
-        """
-        ざっくり: 'name version source updated info...' を取る。
-        ヘッダ行や罫線っぽい行は捨てる。
+        """Parses human-readable `scoop list` output into table rows.
+
+        This is a fallback parser for environments where structured output cannot be
+        obtained. It is intentionally lenient and may break if the CLI format changes.
+
+        Args:
+            text: `scoop list` stdout text.
+
+        Returns:
+            List of rows as tuples `(name, version, source, updated, info)`.
         """
         rows = []
         for line in text.splitlines():
