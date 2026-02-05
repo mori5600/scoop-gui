@@ -10,10 +10,13 @@ app = "python -m app.main"
 designer = "pyside6-designer"
 uic-all = "pwsh -NoProfile -ExecutionPolicy Bypass -File pwsh/ui2py.ps1"
 format = "ruff check --fix app && ruff format app"
+build = "python -m nuitka --standalone --plugin-enable=pyside6 --windows-console-mode=disable --lto=yes --output-filename=scoop-gui app/main.py"
 
 [dependencies]
 python = "3.12.*"
-ruff = ">=0.14.14,<0.15"
+ruff = "==0.14.14"
+ty = "==0.0.14"
+nuitka = "==2.8.10"
 
 [pypi-dependencies]
 pyside6 = { version = "==6.10.1" }

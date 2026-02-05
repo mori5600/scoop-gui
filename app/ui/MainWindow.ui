@@ -11,7 +11,7 @@
       </rect>
     </property>
     <property name="windowTitle">
-      <string>MainWindow</string>
+      <string>Scoop GUI</string>
     </property>
 
     <widget class="QWidget" name="centralwidget">
@@ -259,14 +259,14 @@
                         </widget>
                       </item>
                       <item>
-                        <widget class="QPushButton" name="pushButtonUpdate">
+                        <widget class="QToolButton" name="pushButtonUpdate">
                           <property name="text">
                             <string>Update</string>
                           </property>
                         </widget>
                       </item>
                       <item>
-                        <widget class="QPushButton" name="pushButtonCleanup">
+                        <widget class="QToolButton" name="pushButtonCleanup">
                           <property name="text">
                             <string>Cleanup</string>
                           </property>

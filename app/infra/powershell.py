@@ -24,4 +24,13 @@ def build_powershell_argv(command: str, shell: str | None = None) -> list[str]:
         Argument vector suitable for `subprocess.run(...)`.
     """
     exe = shell or find_powershell_executable()
-    return [exe, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command]
+    return [
+        exe,
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        command,
+    ]

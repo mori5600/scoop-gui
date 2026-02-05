@@ -1,6 +1,7 @@
+import re
 from typing import Callable
 
-from PySide6.QtCore import QObject, QThread, Signal, QTimer
+from PySide6.QtCore import QObject, QThread, QTimer, Signal
 
 from app.core.scoop_export_parser import parse_scoop_export
 from app.infra.powershell import build_powershell_argv
@@ -13,6 +14,12 @@ class ScoopController(QObject):
     log = Signal(str)
     error = Signal(str)
     loaded = Signal(object)  # list[ScoopApp]
+
+    # Strip common ANSI escape sequences (colors, cursor moves, etc.) so the GUI
+    # log doesn't show mojibake like "[33m...".
+    _ANSI_OSC_RE = re.compile(r"\x1b\][^\x07]*(?:\x07|\x1b\\)")
+    _ANSI_CSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+    _ANSI_2CHAR_RE = re.compile(r"\x1b[@-Z\\-_]")
 
     def __init__(self, parent: QObject | None = None):
         """Initializes the controller.
@@ -45,12 +52,31 @@ class ScoopController(QObject):
             timeout_sec=600,
         )
 
+    def update_all_apps(self) -> None:
+        """Updates all installed apps via `scoop update --all`."""
+        self._run_scoop_command(
+            label="scoop update --all",
+            command="scoop update --all",
+            refresh_after=True,
+            timeout_sec=3600,
+        )
+
     def uninstall_app(self, name: str) -> None:
         """Uninstalls the specified app via `scoop uninstall`."""
         quoted = self._ps_quote(name)
         self._run_scoop_command(
             label=f"scoop uninstall {name}",
             command=f"scoop uninstall {quoted}",
+            refresh_after=True,
+            timeout_sec=300,
+        )
+
+    def cleanup_app(self, name: str) -> None:
+        """Cleans old versions for the specified app via `scoop cleanup`."""
+        quoted = self._ps_quote(name)
+        self._run_scoop_command(
+            label=f"scoop cleanup {name}",
+            command=f"scoop cleanup {quoted}",
             refresh_after=True,
             timeout_sec=300,
         )
@@ -94,9 +120,20 @@ class ScoopController(QObject):
                 continue
         return data.decode("utf-8", errors="replace")
 
+    @classmethod
+    def _sanitize_output(cls, text: str) -> str:
+        """Normalizes newlines and removes ANSI escape sequences."""
+        if not text:
+            return ""
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        text = cls._ANSI_OSC_RE.sub("", text)
+        text = cls._ANSI_CSI_RE.sub("", text)
+        text = cls._ANSI_2CHAR_RE.sub("", text)
+        return text
+
     def _emit_output(self, text: str) -> None:
         """Emits non-empty output to the log signal."""
-        output = text.rstrip()
+        output = self._sanitize_output(text).rstrip()
         if output:
             self.log.emit(output)
 
@@ -178,8 +215,9 @@ class ScoopController(QObject):
         out = self._decode(stdout)
         err = self._decode(stderr)
 
-        if err.strip():
-            self.log.emit(err.rstrip())
+        err_clean = self._sanitize_output(err)
+        if err_clean.strip():
+            self.log.emit(err_clean.rstrip())
 
         if returncode != 0:
             self.error.emit(f"[error] scoop failed (code={returncode})")
