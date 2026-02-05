@@ -18,3 +18,13 @@ class ScoopApp:
     source: str = ""
     updated: str = ""
     info: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ScoopSearchResult:
+    """Represents a `scoop search` result row."""
+
+    name: str
+    version: str = ""
+    source: str = ""
+    binaries: str = ""

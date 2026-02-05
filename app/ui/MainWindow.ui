@@ -15,7 +15,7 @@
     </property>
 
     <widget class="QWidget" name="centralwidget">
-      <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <layout class="QVBoxLayout" name="verticalLayoutMain">
         <!-- safe margins -->
         <property name="leftMargin">
           <number>8</number>
@@ -34,281 +34,665 @@
         </property>
 
         <item>
-          <widget class="QSplitter" name="splitterMain">
+          <widget class="QSplitter" name="splitterRoot">
             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+              <enum>Qt::Vertical</enum>
             </property>
 
-            <!-- Left pane -->
-            <widget class="QWidget" name="widgetLeft" native="true">
-              <property name="minimumSize">
-                <size>
-                  <width>320</width>
-                  <height>0</height>
-                </size>
+            <widget class="QTabWidget" name="tabWidgetMain">
+              <property name="currentIndex">
+                <number>0</number>
               </property>
-              <layout class="QVBoxLayout" name="verticalLayoutLeft">
-                <property name="leftMargin">
-                  <number>0</number>
-                </property>
-                <property name="topMargin">
-                  <number>0</number>
-                </property>
-                <property name="rightMargin">
-                  <number>0</number>
-                </property>
-                <property name="bottomMargin">
-                  <number>0</number>
-                </property>
-                <property name="spacing">
-                  <number>6</number>
-                </property>
 
-                <item>
-                  <widget class="QLineEdit" name="lineEditSearch">
-                    <property name="placeholderText">
-                      <string>Search</string>
-                    </property>
-                    <property name="clearButtonEnabled">
-                      <bool>true</bool>
-                    </property>
-                  </widget>
-                </item>
+              <!-- Installed tab -->
+              <widget class="QWidget" name="tabInstalled">
+                <attribute name="title">
+                  <string>Installed</string>
+                </attribute>
+                <layout class="QHBoxLayout" name="horizontalLayoutInstalled">
+                  <property name="leftMargin">
+                    <number>0</number>
+                  </property>
+                  <property name="topMargin">
+                    <number>0</number>
+                  </property>
+                  <property name="rightMargin">
+                    <number>0</number>
+                  </property>
+                  <property name="bottomMargin">
+                    <number>0</number>
+                  </property>
+                  <property name="spacing">
+                    <number>0</number>
+                  </property>
+                  <item>
+                    <widget class="QSplitter" name="splitterMain">
+                      <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                      </property>
 
-                <item>
-                  <widget class="QTableView" name="tableViewPackages">
-                    <property name="alternatingRowColors">
-                      <bool>true</bool>
-                    </property>
-                    <property name="showGrid">
-                      <bool>false</bool>
-                    </property>
-                    <property name="selectionBehavior">
-                      <enum>QAbstractItemView::SelectRows</enum>
-                    </property>
-                    <property name="selectionMode">
-                      <enum>QAbstractItemView::SingleSelection</enum>
-                    </property>
-                  </widget>
-                </item>
-              </layout>
+                      <!-- Left pane -->
+                      <widget class="QWidget" name="widgetLeft" native="true">
+                        <property name="minimumSize">
+                          <size>
+                            <width>320</width>
+                            <height>0</height>
+                          </size>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayoutLeft">
+                          <property name="leftMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="topMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="rightMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="bottomMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="spacing">
+                            <number>6</number>
+                          </property>
+
+                          <item>
+                            <widget class="QLineEdit" name="lineEditSearch">
+                              <property name="placeholderText">
+                                <string>Search</string>
+                              </property>
+                              <property name="clearButtonEnabled">
+                                <bool>true</bool>
+                              </property>
+                            </widget>
+                          </item>
+
+                          <item>
+                            <widget class="QTableView" name="tableViewPackages">
+                              <property name="alternatingRowColors">
+                                <bool>true</bool>
+                              </property>
+                              <property name="showGrid">
+                                <bool>false</bool>
+                              </property>
+                              <property name="selectionBehavior">
+                                <enum>QAbstractItemView::SelectRows</enum>
+                              </property>
+                              <property name="selectionMode">
+                                <enum>QAbstractItemView::SingleSelection</enum>
+                              </property>
+                            </widget>
+                          </item>
+                        </layout>
+                      </widget>
+
+                      <!-- Right pane -->
+                      <widget class="QWidget" name="widgetRight" native="true">
+                        <property name="sizePolicy">
+                          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                          </sizepolicy>
+                        </property>
+
+                        <layout class="QVBoxLayout" name="verticalLayout_2">
+                          <property name="leftMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="topMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="rightMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="bottomMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="spacing">
+                            <number>8</number>
+                          </property>
+
+                          <item>
+                            <widget class="QGroupBox" name="groupBoxDetails">
+                              <property name="maximumSize">
+                                <size>
+                                  <width>16777215</width>
+                                  <height>200</height>
+                                </size>
+                              </property>
+                              <property name="title">
+                                <string>Details</string>
+                              </property>
+
+                              <layout class="QFormLayout" name="formLayoutDetails">
+                                <property name="fieldGrowthPolicy">
+                                  <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+                                </property>
+                                <property name="labelAlignment">
+                                  <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+                                </property>
+                                <property name="formAlignment">
+                                  <set>Qt::AlignTop</set>
+                                </property>
+                                <property name="horizontalSpacing">
+                                  <number>12</number>
+                                </property>
+                                <property name="verticalSpacing">
+                                  <number>6</number>
+                                </property>
+
+                                <!-- safe margins for QFormLayout -->
+                                <property name="leftMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="topMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="rightMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="bottomMargin">
+                                  <number>8</number>
+                                </property>
+
+                                <item row="0" column="0">
+                                  <widget class="QLabel" name="labelName">
+                                    <property name="text">
+                                      <string>Name</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item row="0" column="1">
+                                  <widget class="QLabel" name="labelNameValue">
+                                    <property name="sizePolicy">
+                                      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                                        <horstretch>0</horstretch>
+                                        <verstretch>0</verstretch>
+                                      </sizepolicy>
+                                    </property>
+                                    <property name="text">
+                                      <string>-</string>
+                                    </property>
+                                    <property name="textInteractionFlags">
+                                      <set>Qt::TextSelectableByMouse</set>
+                                    </property>
+                                  </widget>
+                                </item>
+
+                                <item row="1" column="0">
+                                  <widget class="QLabel" name="labelVersion">
+                                    <property name="text">
+                                      <string>Version</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item row="1" column="1">
+                                  <widget class="QLabel" name="labelVersionValue">
+                                    <property name="sizePolicy">
+                                      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                                        <horstretch>0</horstretch>
+                                        <verstretch>0</verstretch>
+                                      </sizepolicy>
+                                    </property>
+                                    <property name="text">
+                                      <string>-</string>
+                                    </property>
+                                    <property name="textInteractionFlags">
+                                      <set>Qt::TextSelectableByMouse</set>
+                                    </property>
+                                  </widget>
+                                </item>
+                              </layout>
+                            </widget>
+                          </item>
+
+                          <item>
+                            <widget class="QGroupBox" name="groupBoxActions">
+                              <property name="title">
+                                <string>Actions</string>
+                              </property>
+                              <layout class="QHBoxLayout" name="horizontalLayoutActions">
+                                <property name="leftMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="topMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="rightMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="bottomMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="spacing">
+                                  <number>8</number>
+                                </property>
+
+                                <item>
+                                  <widget class="QPushButton" name="pushButtonRefresh">
+                                    <property name="text">
+                                      <string>Refresh</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item>
+                                  <widget class="QPushButton" name="pushButtonUninstall">
+                                    <property name="text">
+                                      <string>Uninstall</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item>
+                                  <widget class="QToolButton" name="pushButtonUpdate">
+                                    <property name="text">
+                                      <string>Update</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item>
+                                  <widget class="QToolButton" name="pushButtonCleanup">
+                                    <property name="text">
+                                      <string>Cleanup</string>
+                                    </property>
+                                  </widget>
+                                </item>
+
+                                <!-- stretch to keep buttons left-aligned -->
+                                <item>
+                                  <spacer name="horizontalSpacerActions">
+                                    <property name="orientation">
+                                      <enum>Qt::Horizontal</enum>
+                                    </property>
+                                    <property name="sizeHint" stdset="0">
+                                      <size>
+                                        <width>40</width>
+                                        <height>20</height>
+                                      </size>
+                                    </property>
+                                  </spacer>
+                                </item>
+                              </layout>
+                            </widget>
+                          </item>
+
+                          <!-- vertical stretch -->
+                          <item>
+                            <spacer name="verticalSpacerInstalled">
+                              <property name="orientation">
+                                <enum>Qt::Vertical</enum>
+                              </property>
+                              <property name="sizeHint" stdset="0">
+                                <size>
+                                  <width>20</width>
+                                  <height>40</height>
+                                </size>
+                              </property>
+                            </spacer>
+                          </item>
+
+                        </layout>
+                      </widget>
+                    </widget>
+                  </item>
+                </layout>
+              </widget>
+
+              <!-- Discover tab -->
+              <widget class="QWidget" name="tabDiscover">
+                <attribute name="title">
+                  <string>Discover</string>
+                </attribute>
+                <layout class="QHBoxLayout" name="horizontalLayoutDiscover">
+                  <property name="leftMargin">
+                    <number>0</number>
+                  </property>
+                  <property name="topMargin">
+                    <number>0</number>
+                  </property>
+                  <property name="rightMargin">
+                    <number>0</number>
+                  </property>
+                  <property name="bottomMargin">
+                    <number>0</number>
+                  </property>
+                  <property name="spacing">
+                    <number>0</number>
+                  </property>
+                  <item>
+                    <widget class="QSplitter" name="splitterDiscover">
+                      <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                      </property>
+
+                      <!-- Left pane -->
+                      <widget class="QWidget" name="widgetDiscoverLeft" native="true">
+                        <property name="minimumSize">
+                          <size>
+                            <width>320</width>
+                            <height>0</height>
+                          </size>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayoutDiscoverLeft">
+                          <property name="leftMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="topMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="rightMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="bottomMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="spacing">
+                            <number>6</number>
+                          </property>
+
+                          <item>
+                            <layout class="QHBoxLayout" name="horizontalLayoutDiscoverSearch">
+                              <property name="leftMargin">
+                                <number>0</number>
+                              </property>
+                              <property name="topMargin">
+                                <number>0</number>
+                              </property>
+                              <property name="rightMargin">
+                                <number>0</number>
+                              </property>
+                              <property name="bottomMargin">
+                                <number>0</number>
+                              </property>
+                              <property name="spacing">
+                                <number>6</number>
+                              </property>
+
+                              <item>
+                                <widget class="QLineEdit" name="lineEditDiscoverSearch">
+                                  <property name="placeholderText">
+                                    <string>Search apps to install</string>
+                                  </property>
+                                  <property name="clearButtonEnabled">
+                                    <bool>true</bool>
+                                  </property>
+                                </widget>
+                              </item>
+
+                              <item>
+                                <widget class="QPushButton" name="pushButtonDiscoverSearch">
+                                  <property name="text">
+                                    <string>Search</string>
+                                  </property>
+                                </widget>
+                              </item>
+                            </layout>
+                          </item>
+
+                          <item>
+                            <widget class="QLabel" name="labelDiscoverStatus">
+                              <property name="text">
+                                <string>Type at least 2 characters, then click Search</string>
+                              </property>
+                              <property name="wordWrap">
+                                <bool>true</bool>
+                              </property>
+                            </widget>
+                          </item>
+
+                          <item>
+                            <widget class="QTableView" name="tableViewDiscover">
+                              <property name="alternatingRowColors">
+                                <bool>true</bool>
+                              </property>
+                              <property name="showGrid">
+                                <bool>false</bool>
+                              </property>
+                              <property name="selectionBehavior">
+                                <enum>QAbstractItemView::SelectRows</enum>
+                              </property>
+                              <property name="selectionMode">
+                                <enum>QAbstractItemView::SingleSelection</enum>
+                              </property>
+                            </widget>
+                          </item>
+                        </layout>
+                      </widget>
+
+                      <!-- Right pane -->
+                      <widget class="QWidget" name="widgetDiscoverRight" native="true">
+                        <property name="sizePolicy">
+                          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                          </sizepolicy>
+                        </property>
+
+                        <layout class="QVBoxLayout" name="verticalLayoutDiscoverRight">
+                          <property name="leftMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="topMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="rightMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="bottomMargin">
+                            <number>0</number>
+                          </property>
+                          <property name="spacing">
+                            <number>8</number>
+                          </property>
+
+                          <item>
+                            <widget class="QGroupBox" name="groupBoxDiscoverDetails">
+                              <property name="maximumSize">
+                                <size>
+                                  <width>16777215</width>
+                                  <height>240</height>
+                                </size>
+                              </property>
+                              <property name="title">
+                                <string>Details</string>
+                              </property>
+
+                              <layout class="QFormLayout" name="formLayoutDiscoverDetails">
+                                <property name="fieldGrowthPolicy">
+                                  <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+                                </property>
+                                <property name="labelAlignment">
+                                  <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+                                </property>
+                                <property name="formAlignment">
+                                  <set>Qt::AlignTop</set>
+                                </property>
+                                <property name="horizontalSpacing">
+                                  <number>12</number>
+                                </property>
+                                <property name="verticalSpacing">
+                                  <number>6</number>
+                                </property>
+                                <property name="leftMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="topMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="rightMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="bottomMargin">
+                                  <number>8</number>
+                                </property>
+
+                                <item row="0" column="0">
+                                  <widget class="QLabel" name="labelDiscoverName">
+                                    <property name="text">
+                                      <string>Name</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item row="0" column="1">
+                                  <widget class="QLabel" name="labelDiscoverNameValue">
+                                    <property name="text">
+                                      <string>-</string>
+                                    </property>
+                                    <property name="textInteractionFlags">
+                                      <set>Qt::TextSelectableByMouse</set>
+                                    </property>
+                                  </widget>
+                                </item>
+
+                                <item row="1" column="0">
+                                  <widget class="QLabel" name="labelDiscoverVersion">
+                                    <property name="text">
+                                      <string>Version</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item row="1" column="1">
+                                  <widget class="QLabel" name="labelDiscoverVersionValue">
+                                    <property name="text">
+                                      <string>-</string>
+                                    </property>
+                                    <property name="textInteractionFlags">
+                                      <set>Qt::TextSelectableByMouse</set>
+                                    </property>
+                                  </widget>
+                                </item>
+
+                                <item row="2" column="0">
+                                  <widget class="QLabel" name="labelDiscoverSource">
+                                    <property name="text">
+                                      <string>Source</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item row="2" column="1">
+                                  <widget class="QLabel" name="labelDiscoverSourceValue">
+                                    <property name="text">
+                                      <string>-</string>
+                                    </property>
+                                    <property name="textInteractionFlags">
+                                      <set>Qt::TextSelectableByMouse</set>
+                                    </property>
+                                  </widget>
+                                </item>
+
+                                <item row="3" column="0">
+                                  <widget class="QLabel" name="labelDiscoverBinaries">
+                                    <property name="text">
+                                      <string>Binaries</string>
+                                    </property>
+                                  </widget>
+                                </item>
+                                <item row="3" column="1">
+                                  <widget class="QLabel" name="labelDiscoverBinariesValue">
+                                    <property name="text">
+                                      <string>-</string>
+                                    </property>
+                                    <property name="wordWrap">
+                                      <bool>true</bool>
+                                    </property>
+                                    <property name="textInteractionFlags">
+                                      <set>Qt::TextSelectableByMouse</set>
+                                    </property>
+                                  </widget>
+                                </item>
+                              </layout>
+                            </widget>
+                          </item>
+
+                          <item>
+                            <widget class="QGroupBox" name="groupBoxDiscoverActions">
+                              <property name="title">
+                                <string>Actions</string>
+                              </property>
+                              <layout class="QHBoxLayout" name="horizontalLayoutDiscoverActions">
+                                <property name="leftMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="topMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="rightMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="bottomMargin">
+                                  <number>8</number>
+                                </property>
+                                <property name="spacing">
+                                  <number>8</number>
+                                </property>
+
+                                <item>
+                                  <widget class="QPushButton" name="pushButtonInstall">
+                                    <property name="text">
+                                      <string>Install</string>
+                                    </property>
+                                  </widget>
+                                </item>
+
+                                <item>
+                                  <spacer name="horizontalSpacerDiscoverActions">
+                                    <property name="orientation">
+                                      <enum>Qt::Horizontal</enum>
+                                    </property>
+                                    <property name="sizeHint" stdset="0">
+                                      <size>
+                                        <width>40</width>
+                                        <height>20</height>
+                                      </size>
+                                    </property>
+                                  </spacer>
+                                </item>
+                              </layout>
+                            </widget>
+                          </item>
+
+                          <item>
+                            <spacer name="verticalSpacerDiscover">
+                              <property name="orientation">
+                                <enum>Qt::Vertical</enum>
+                              </property>
+                              <property name="sizeHint" stdset="0">
+                                <size>
+                                  <width>20</width>
+                                  <height>40</height>
+                                </size>
+                              </property>
+                            </spacer>
+                          </item>
+
+                        </layout>
+                      </widget>
+                    </widget>
+                  </item>
+                </layout>
+              </widget>
+
             </widget>
 
-            <!-- Right pane -->
-            <widget class="QWidget" name="widgetRight" native="true">
-              <property name="sizePolicy">
-                <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                </sizepolicy>
+            <!-- Global log (shared across tabs) -->
+            <widget class="QPlainTextEdit" name="plainTextEditLog">
+              <property name="readOnly">
+                <bool>true</bool>
               </property>
-
-              <layout class="QVBoxLayout" name="verticalLayout_2">
-                <property name="leftMargin">
-                  <number>0</number>
-                </property>
-                <property name="topMargin">
-                  <number>0</number>
-                </property>
-                <property name="rightMargin">
-                  <number>0</number>
-                </property>
-                <property name="bottomMargin">
-                  <number>0</number>
-                </property>
-                <property name="spacing">
-                  <number>8</number>
-                </property>
-
-                <item>
-                  <widget class="QGroupBox" name="groupBoxDetails">
-                    <property name="maximumSize">
-                      <size>
-                        <width>16777215</width>
-                        <height>200</height>
-                      </size>
-                    </property>
-                    <property name="title">
-                      <string>Details</string>
-                    </property>
-
-                    <layout class="QFormLayout" name="formLayoutDetails">
-                      <property name="fieldGrowthPolicy">
-                        <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
-                      </property>
-                      <property name="labelAlignment">
-                        <set>Qt::AlignLeft|Qt::AlignVCenter</set>
-                      </property>
-                      <property name="formAlignment">
-                        <set>Qt::AlignTop</set>
-                      </property>
-                      <property name="horizontalSpacing">
-                        <number>12</number>
-                      </property>
-                      <property name="verticalSpacing">
-                        <number>6</number>
-                      </property>
-
-                      <!-- safe margins for QFormLayout -->
-                      <property name="leftMargin">
-                        <number>8</number>
-                      </property>
-                      <property name="topMargin">
-                        <number>8</number>
-                      </property>
-                      <property name="rightMargin">
-                        <number>8</number>
-                      </property>
-                      <property name="bottomMargin">
-                        <number>8</number>
-                      </property>
-
-                      <item row="0" column="0">
-                        <widget class="QLabel" name="labelName">
-                          <property name="text">
-                            <string>Name</string>
-                          </property>
-                        </widget>
-                      </item>
-                      <item row="0" column="1">
-                        <widget class="QLabel" name="labelNameValue">
-                          <property name="sizePolicy">
-                            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-                              <horstretch>0</horstretch>
-                              <verstretch>0</verstretch>
-                            </sizepolicy>
-                          </property>
-                          <property name="text">
-                            <string>-</string>
-                          </property>
-                          <property name="textInteractionFlags">
-                            <set>Qt::TextSelectableByMouse</set>
-                          </property>
-                        </widget>
-                      </item>
-
-                      <item row="1" column="0">
-                        <widget class="QLabel" name="labelVersion">
-                          <property name="text">
-                            <string>Version</string>
-                          </property>
-                        </widget>
-                      </item>
-                      <item row="1" column="1">
-                        <widget class="QLabel" name="labelVersionValue">
-                          <property name="sizePolicy">
-                            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-                              <horstretch>0</horstretch>
-                              <verstretch>0</verstretch>
-                            </sizepolicy>
-                          </property>
-                          <property name="text">
-                            <string>-</string>
-                          </property>
-                          <property name="textInteractionFlags">
-                            <set>Qt::TextSelectableByMouse</set>
-                          </property>
-                        </widget>
-                      </item>
-                    </layout>
-                  </widget>
-                </item>
-
-                <!-- Actions pane (added) -->
-                <item>
-                  <widget class="QGroupBox" name="groupBoxActions">
-                    <property name="title">
-                      <string>Actions</string>
-                    </property>
-                    <layout class="QHBoxLayout" name="horizontalLayoutActions">
-                      <property name="leftMargin">
-                        <number>8</number>
-                      </property>
-                      <property name="topMargin">
-                        <number>8</number>
-                      </property>
-                      <property name="rightMargin">
-                        <number>8</number>
-                      </property>
-                      <property name="bottomMargin">
-                        <number>8</number>
-                      </property>
-                      <property name="spacing">
-                        <number>8</number>
-                      </property>
-
-                      <item>
-                        <widget class="QPushButton" name="pushButtonRefresh">
-                          <property name="text">
-                            <string>Refresh</string>
-                          </property>
-                        </widget>
-                      </item>
-                      <item>
-                        <widget class="QPushButton" name="pushButtonInstall">
-                          <property name="text">
-                            <string>Install</string>
-                          </property>
-                        </widget>
-                      </item>
-                      <item>
-                        <widget class="QPushButton" name="pushButtonUninstall">
-                          <property name="text">
-                            <string>Uninstall</string>
-                          </property>
-                        </widget>
-                      </item>
-                      <item>
-                        <widget class="QToolButton" name="pushButtonUpdate">
-                          <property name="text">
-                            <string>Update</string>
-                          </property>
-                        </widget>
-                      </item>
-                      <item>
-                        <widget class="QToolButton" name="pushButtonCleanup">
-                          <property name="text">
-                            <string>Cleanup</string>
-                          </property>
-                        </widget>
-                      </item>
-
-                      <!-- stretch to keep buttons left-aligned -->
-                      <item>
-                        <spacer name="horizontalSpacerActions">
-                          <property name="orientation">
-                            <enum>Qt::Horizontal</enum>
-                          </property>
-                          <property name="sizeHint" stdset="0">
-                            <size>
-                              <width>40</width>
-                              <height>20</height>
-                            </size>
-                          </property>
-                        </spacer>
-                      </item>
-                    </layout>
-                  </widget>
-                </item>
-
-                <item>
-                  <widget class="QPlainTextEdit" name="plainTextEditLog">
-                    <property name="readOnly">
-                      <bool>true</bool>
-                    </property>
-                    <property name="lineWrapMode">
-                      <enum>QPlainTextEdit::NoWrap</enum>
-                    </property>
-                    <property name="font">
-                      <font>
-                        <family>Consolas</family>
-                        <pointsize>9</pointsize>
-                      </font>
-                    </property>
-                  </widget>
-                </item>
-
-              </layout>
+              <property name="lineWrapMode">
+                <enum>QPlainTextEdit::NoWrap</enum>
+              </property>
+              <property name="minimumSize">
+                <size>
+                  <width>0</width>
+                  <height>140</height>
+                </size>
+              </property>
+              <property name="font">
+                <font>
+                  <family>Consolas</family>
+                  <pointsize>9</pointsize>
+                </font>
+              </property>
             </widget>
           </widget>
         </item>
