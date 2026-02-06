@@ -8,9 +8,10 @@ version = "0.1.0"
 [tasks]
 app = "python -m app.main"
 designer = "pyside6-designer"
-uic-all = "pwsh -NoProfile -ExecutionPolicy Bypass -File pwsh/ui2py.ps1"
-format = "ruff check --fix app && ruff format app"
-build = "python -m nuitka --standalone --plugin-enable=pyside6 --windows-console-mode=disable --lto=yes --output-filename=scoop-gui app/main.py"
+uic-all = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/ui2py.ps1"
+check = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/check.ps1"
+format = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/format.ps1"
+build = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/build.ps1"
 
 [dependencies]
 python = "3.12.*"

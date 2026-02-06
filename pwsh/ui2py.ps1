@@ -12,4 +12,5 @@ Get-ChildItem -Path $uiDir -Filter *.ui | ForEach-Object {
     Write-Host "Generated $outPath"
 }
 
-ruff check $outDir --fix && ruff format $outDir
+ruff check $outDir --fix
+ruff format $outDir
