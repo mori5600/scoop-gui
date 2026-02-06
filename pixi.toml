@@ -21,3 +21,4 @@ nuitka = "==2.8.10"
 
 [pypi-dependencies]
 pyside6 = { version = "==6.10.1" }
+logly = "==0.1.6"

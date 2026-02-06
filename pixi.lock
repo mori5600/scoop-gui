@@ -35,6 +35,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.44.35208-h818238b_34.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_34.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
+      - pypi: https://files.pythonhosted.org/packages/84/0b/2be985049fbf7800340d200aadd11c1fc7a22b64fe4cc4251f182afad64a/logly-0.1.6-cp312-cp312-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/26/41/3f48d724ecc8e42cea8a8442aa9b5a86d394b85093275990038fd1020039/pyside6-6.10.1-cp39-abi3-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/04/14/58239776499e6b279fa6ca2e0d47209531454b99f6bd2ad7c96f11109416/pyside6_addons-6.10.1-cp39-abi3-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/1e/64/a8df6333de8ccbf3a320e1346ca30d0f314840aff5e3db9b4b66bf38e26c/pyside6_essentials-6.10.1-cp39-abi3-win_amd64.whl
@@ -157,6 +158,11 @@ packages:
   purls: []
   size: 55476
   timestamp: 1727963768015
+- pypi: https://files.pythonhosted.org/packages/84/0b/2be985049fbf7800340d200aadd11c1fc7a22b64fe4cc4251f182afad64a/logly-0.1.6-cp312-cp312-win_amd64.whl
+  name: logly
+  version: 0.1.6
+  sha256: 2c92ddb3b90933d7eadfc0f8e3e573d131801cf0a112b3ae8130e44c8739504f
+  requires_python: '>=3.10,<=3.14'
 - conda: https://conda.anaconda.org/conda-forge/win-64/nuitka-2.8.10-py312h83acffa_0.conda
   sha256: be09d52eb33e17d90d11c86a436ae3d81140a85fbb2ebeff31ada13d725b599c
   md5: b530e7dafc078db13d8ca60477eb425e
