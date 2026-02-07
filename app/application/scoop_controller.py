@@ -1,6 +1,7 @@
 import re
 from typing import Callable
 
+from logly import logger
 from PySide6.QtCore import QObject, QThread, Signal
 
 from app.core.scoop_export_parser import parse_scoop_export
@@ -38,6 +39,7 @@ class ScoopController(QObject):
         self._active_job_id = 0
         self._active_label = ""
         self._refresh_after_finish = False
+        logger.info("ScoopController initialized")
 
     def is_busy(self) -> bool:
         return self._thread is not None
@@ -185,6 +187,8 @@ class ScoopController(QObject):
         output = self._sanitize_output(text).rstrip()
         if output:
             self.log.emit(output)
+            for line in output.splitlines():
+                logger.info(f"[scoop] {line}")
 
     def _start_job(
         self,
@@ -196,12 +200,16 @@ class ScoopController(QObject):
     ) -> None:
         if self._thread is not None:
             self.log.emit("[info] already running")
+            logger.warning(
+                f"Job rejected because controller is busy: requested={label} active={self._active_label}"
+            )
             return
 
         self._active_job_id += 1
         job_id = self._active_job_id
         self._active_label = label
         self._refresh_after_finish = False
+        logger.info(f"Starting job id={job_id} label={label} timeout={timeout_sec}s")
 
         if announce:
             self.log.emit(f"$ {label}")
@@ -265,6 +273,9 @@ class ScoopController(QObject):
             returncode: Process return code.
         """
         if job_id != self._active_job_id:
+            logger.warning(
+                f"Ignored stale export result: job_id={job_id} active_job_id={self._active_job_id}"
+            )
             return
 
         out = self._decode(stdout)
@@ -273,26 +284,35 @@ class ScoopController(QObject):
         err_clean = self._sanitize_output(err)
         if err_clean.strip():
             self.log.emit(err_clean.rstrip())
+            logger.warning(f"stderr from {self._active_label}: {err_clean.rstrip()}")
 
         if returncode != 0:
+            logger.error(
+                f"Export command failed: label={self._active_label} code={returncode}"
+            )
             self.error.emit(f"[error] scoop failed (code={returncode})")
             self.job_finished.emit(self._active_label, returncode)
             return
 
         apps = parse_scoop_export(out)
         if apps is None:
+            logger.error("Failed to parse scoop export JSON output")
             self.error.emit("[error] failed to parse scoop export json")
             self.job_finished.emit(self._active_label, 1)
             return
 
         self.loaded.emit(apps)
         self.log.emit(f"[loaded] {len(apps)} packages")
+        logger.info(f"Loaded {len(apps)} installed packages")
         self.job_finished.emit(self._active_label, 0)
 
     def _on_search_finished(
         self, job_id: int, stdout: bytes, stderr: bytes, returncode: int
     ) -> None:
         if job_id != self._active_job_id:
+            logger.warning(
+                f"Ignored stale search result: job_id={job_id} active_job_id={self._active_job_id}"
+            )
             return
 
         out = self._decode(stdout)
@@ -303,25 +323,35 @@ class ScoopController(QObject):
             # Avoid logging the JSON payload; keep log noise minimal for search.
             if "no matches found" in combined_clean.lower():
                 self.log.emit("WARN  No matches found.")
+                logger.warning(f"No matches found for search: {self._active_label}")
 
         if returncode != 0:
             # Scoop uses code=1 for "no matches found" (similar to grep).
             if "no matches found" in combined_clean.lower():
                 self.searched.emit([])
                 # Treat as a successful search completion for UX.
+                logger.info(f"Search completed with no results: {self._active_label}")
                 self.job_finished.emit(self._active_label, 0)
                 return
 
             err_clean = self._sanitize_output(err).strip()
             if err_clean:
                 self.log.emit(err_clean)
+                logger.error(f"stderr from {self._active_label}: {err_clean}")
 
+            logger.error(
+                f"Search command failed: label={self._active_label} code={returncode}"
+            )
             self.error.emit(f"[error] scoop failed (code={returncode})")
             self.searched.emit([])
             self.job_finished.emit(self._active_label, returncode)
             return
 
-        self.searched.emit(parse_scoop_search(out))
+        results = parse_scoop_search(out)
+        self.searched.emit(results)
+        logger.info(
+            f"Search completed: label={self._active_label} result_count={len(results)}"
+        )
         self.job_finished.emit(self._active_label, 0)
 
     def _on_command_finished(
@@ -334,6 +364,9 @@ class ScoopController(QObject):
     ) -> None:
         """Handles finished Scoop commands that are not `scoop export`."""
         if job_id != self._active_job_id:
+            logger.warning(
+                f"Ignored stale command result: job_id={job_id} active_job_id={self._active_job_id}"
+            )
             return
 
         out = self._decode(stdout)
@@ -343,11 +376,19 @@ class ScoopController(QObject):
         self._emit_output(err)
 
         if returncode != 0:
+            logger.error(
+                f"Command failed: label={self._active_label} code={returncode}"
+            )
             self.error.emit(f"[error] scoop failed (code={returncode})")
             self.job_finished.emit(self._active_label, returncode)
             return
 
         if refresh_after:
             self._refresh_after_finish = True
+            logger.info(
+                f"Command succeeded and queued refresh: label={self._active_label}"
+            )
+        else:
+            logger.info(f"Command succeeded: label={self._active_label}")
 
         self.job_finished.emit(self._active_label, 0)

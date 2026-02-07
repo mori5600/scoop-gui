@@ -2,6 +2,7 @@ import os
 import subprocess
 from typing import Final
 
+from logly import logger
 from PySide6.QtCore import QObject, Signal, Slot
 
 _CREATE_NO_WINDOW: Final[int] = 0x08000000
@@ -24,6 +25,9 @@ class SubprocessWorker(QObject):
     def run(self):
         """Executes the configured command and emits `finished`."""
         try:
+            logger.info(
+                f"Starting subprocess timeout={self._timeout_sec}s argv={' '.join(self._argv)}"
+            )
             kwargs: dict = {
                 "capture_output": True,
                 "timeout": self._timeout_sec,
@@ -33,9 +37,12 @@ class SubprocessWorker(QObject):
                 kwargs["creationflags"] = _CREATE_NO_WINDOW
 
             result = subprocess.run(self._argv, **kwargs)
+            logger.info(f"Subprocess finished returncode={result.returncode}")
             self.finished.emit(result.stdout, result.stderr, result.returncode)
 
         except subprocess.TimeoutExpired:
+            logger.warning("Subprocess timed out")
             self.finished.emit(b"", b"timeout: command exceeded limit", 124)
         except Exception as e:
+            logger.exception("Subprocess execution failed")
             self.finished.emit(b"", str(e).encode("utf-8", errors="replace"), 1)
