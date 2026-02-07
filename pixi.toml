@@ -12,12 +12,14 @@ uic-all = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/ui2py.ps1"
 check = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/check.ps1"
 format = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/format.ps1"
 build = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/build.ps1"
+test = "powershell -NoProfile -ExecutionPolicy Bypass -File pwsh/test.ps1"
 
 [dependencies]
 python = "3.12.*"
 ruff = "==0.14.14"
 ty = "==0.0.14"
 nuitka = "==2.8.10"
+pytest = "==9.0.2"
 
 [pypi-dependencies]
 pyside6 = { version = "==6.10.1" }
