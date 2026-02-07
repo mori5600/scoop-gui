@@ -1,5 +1,4 @@
 from PySide6.QtCore import QSortFilterProxyModel, Qt, QTimer
-from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHeaderView,
@@ -10,11 +9,8 @@ from PySide6.QtWidgets import (
 
 from app.application.scoop_controller import ScoopController
 from app.core.scoop_types import ScoopApp, ScoopSearchResult
-
-try:
-    from ..ui_generated.ui_MainWindow import Ui_MainWindow
-except ImportError:
-    from app.ui_generated.ui_MainWindow import Ui_MainWindow
+from app.presentation.table_models import DiscoverTableModel, InstalledTableModel
+from app.ui_generated.ui_MainWindow import Ui_MainWindow
 
 
 class MainWindow(QMainWindow):
@@ -24,6 +20,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._busy = False
         self._installed_initial_sort_applied = False
+        self._installed_columns_initialized = False
         self._discover_splitter_polished = False
         self._discover_columns_initialized = False
 
@@ -40,10 +37,7 @@ class MainWindow(QMainWindow):
         self.ui.tabWidgetMain.currentChanged.connect(self.on_tab_changed)
 
         # ---- Installed tab
-        self.model = QStandardItemModel(0, 5, self)
-        self.model.setHorizontalHeaderLabels(
-            ["Name", "Version", "Source", "Updated", "Info"]
-        )
+        self.model = InstalledTableModel(self)
 
         self.proxy = QSortFilterProxyModel(self)
         self.proxy.setSourceModel(self.model)
@@ -64,10 +58,7 @@ class MainWindow(QMainWindow):
         self._polish_installed_table()
 
         # ---- Discover tab
-        self.discover_model = QStandardItemModel(0, 4, self)
-        self.discover_model.setHorizontalHeaderLabels(
-            ["Name", "Version", "Source", "Binaries"]
-        )
+        self.discover_model = DiscoverTableModel(self)
         self.ui.tableViewDiscover.setModel(self.discover_model)
         self.ui.tableViewDiscover.setSortingEnabled(True)
         self.ui.tableViewDiscover.sortByColumn(0, Qt.SortOrder.AscendingOrder)
@@ -124,9 +115,9 @@ class MainWindow(QMainWindow):
         hh = tv.horizontalHeader()
         hh.setStretchLastSection(True)
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        hh.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
 
         tv.setWordWrap(False)
         tv.setAlternatingRowColors(True)
@@ -134,6 +125,20 @@ class MainWindow(QMainWindow):
         tv.setSortingEnabled(True)
         tv.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         tv.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+        if not self._installed_columns_initialized:
+            tv.setColumnWidth(1, 120)
+            tv.setColumnWidth(2, 100)
+            tv.setColumnWidth(3, 160)
+            self._installed_columns_initialized = True
+
+    def _fit_installed_metadata_columns(self) -> None:
+        """Fits Installed metadata columns once after model updates."""
+        tv = self.ui.tableViewPackages
+        for column, minimum, maximum in ((1, 90, 220), (2, 90, 180), (3, 120, 280)):
+            tv.resizeColumnToContents(column)
+            width = tv.columnWidth(column)
+            tv.setColumnWidth(column, max(minimum, min(width, maximum)))
 
     def _polish_discover_table(self) -> None:
         """Applies initial settings to the Discover table."""
@@ -253,37 +258,27 @@ class MainWindow(QMainWindow):
         Args:
             apps_obj: List of `ScoopApp` instances (passed via Qt signals).
         """
-        apps = apps_obj if isinstance(apps_obj, list) else []
-        self._installed_names = {
-            app.name for app in apps if isinstance(app, ScoopApp) and app.name
-        }
+        raw = apps_obj if isinstance(apps_obj, list) else []
+        apps = [app for app in raw if isinstance(app, ScoopApp)]
+        self._installed_names = {app.name for app in apps if app.name}
 
         tv = self.ui.tableViewPackages
         sorting_was_enabled = tv.isSortingEnabled()
-        tv.setSortingEnabled(False)
-
-        self.model.setRowCount(0)
-        for app in apps:
-            if not isinstance(app, ScoopApp):
-                continue
-            self.model.appendRow(
-                [
-                    QStandardItem(app.name),
-                    QStandardItem(app.version),
-                    QStandardItem(app.source),
-                    QStandardItem(app.updated),
-                    QStandardItem(app.info),
-                ]
-            )
-
-        tv.resizeColumnsToContents()
-        tv.setSortingEnabled(sorting_was_enabled)
-
-        # Re-apply sorting after repopulating the model.
-        # First load defaults to Name ascending; later loads keep the current sort selection.
         hh = tv.horizontalHeader()
         section = hh.sortIndicatorSection()
         order = hh.sortIndicatorOrder()
+        tv.setSortingEnabled(False)
+        tv.setUpdatesEnabled(False)
+
+        try:
+            self.model.set_apps(apps)
+            self._fit_installed_metadata_columns()
+        finally:
+            tv.setUpdatesEnabled(True)
+            tv.setSortingEnabled(sorting_was_enabled)
+
+        # Re-apply sorting after repopulating the model.
+        # First load defaults to Name ascending; later loads keep the current sort selection.
         if not self._installed_initial_sort_applied:
             section, order = 0, Qt.SortOrder.AscendingOrder
             hh.setSortIndicator(section, order)
@@ -338,9 +333,11 @@ class MainWindow(QMainWindow):
             return
 
         src = self.proxy.mapToSource(current)
-        name = self.model.item(src.row(), 0).text()
-        ver = self.model.item(src.row(), 1).text()
-        self.set_installed_details(name, ver)
+        app = self.model.app_at(src.row())
+        if app is None:
+            self.set_installed_details("-", "-")
+            return
+        self.set_installed_details(app.name, app.version)
 
     def _selected_installed_app_name(self) -> str | None:
         """Returns the selected Installed app name, if any."""
@@ -349,11 +346,11 @@ class MainWindow(QMainWindow):
             return None
 
         src = self.proxy.mapToSource(current)
-        item = self.model.item(src.row(), 0)
-        if item is None:
+        app = self.model.app_at(src.row())
+        if app is None:
             return None
 
-        name = item.text().strip()
+        name = app.name.strip()
         return name or None
 
     def _require_installed_selection(self, action: str) -> str | None:
@@ -372,13 +369,8 @@ class MainWindow(QMainWindow):
         # Ensure it isn't hidden by the filter.
         self.ui.lineEditSearch.setText("")
 
-        for row in range(self.model.rowCount()):
-            item = self.model.item(row, 0)
-            if item is None:
-                continue
-            if item.text().strip() != name:
-                continue
-
+        row = self.model.row_for_name(name)
+        if row is not None:
             src_idx = self.model.index(row, 0)
             idx = self.proxy.mapFromSource(src_idx)
             if idx.isValid():
@@ -437,7 +429,7 @@ class MainWindow(QMainWindow):
 
         # Prevent stale results from looking like they match the new query.
         if query != self._last_discover_query:
-            self.discover_model.setRowCount(0)
+            self.discover_model.set_results([])
             self.set_discover_details("-", "-", "-", "-")
             self._sync_discover_install_button()
 
@@ -452,7 +444,7 @@ class MainWindow(QMainWindow):
             self.ui.labelDiscoverStatus.setText(
                 "Type at least 2 characters, then click Search"
             )
-            self.discover_model.setRowCount(0)
+            self.discover_model.set_results([])
             self.set_discover_details("-", "-", "-", "-")
             self._sync_discover_install_button()
             return
@@ -474,16 +466,16 @@ class MainWindow(QMainWindow):
 
         tv = self.ui.tableViewDiscover
         sorting_was_enabled = tv.isSortingEnabled()
+        hh = tv.horizontalHeader()
+        sort_section = hh.sortIndicatorSection()
+        sort_order = hh.sortIndicatorOrder()
         tv.setSortingEnabled(False)
         tv.setUpdatesEnabled(False)
 
         try:
-            self.discover_model.setRowCount(len(rows))
-            for row, item in enumerate(rows):
-                self.discover_model.setItem(row, 0, QStandardItem(item.name))
-                self.discover_model.setItem(row, 1, QStandardItem(item.version))
-                self.discover_model.setItem(row, 2, QStandardItem(item.source))
-                self.discover_model.setItem(row, 3, QStandardItem(item.binaries))
+            self.discover_model.set_results(rows)
+            if sort_section >= 0:
+                self.discover_model.sort(sort_section, sort_order)
 
             self._fit_discover_metadata_columns()
         finally:
@@ -507,13 +499,17 @@ class MainWindow(QMainWindow):
             self._sync_discover_install_button()
             return
 
-        row = current.row()
-        name = self.discover_model.item(row, 0).text()
-        version = self.discover_model.item(row, 1).text()
-        source = self.discover_model.item(row, 2).text()
-        binaries = self.discover_model.item(row, 3).text()
+        row = self.discover_model.result_at(current.row())
+        if row is None:
+            self.set_discover_details("-", "-", "-", "-")
+            self._sync_discover_install_button()
+            return
+
         self.set_discover_details(
-            name or "-", version or "-", source or "-", binaries or "-"
+            row.name or "-",
+            row.version or "-",
+            row.source or "-",
+            row.binaries or "-",
         )
         self._sync_discover_install_button()
 
@@ -521,10 +517,10 @@ class MainWindow(QMainWindow):
         current = self.ui.tableViewDiscover.currentIndex()
         if not current.isValid():
             return None
-        item = self.discover_model.item(current.row(), 0)
-        if item is None:
+        row = self.discover_model.result_at(current.row())
+        if row is None:
             return None
-        name = item.text().strip()
+        name = row.name.strip()
         return name or None
 
     def _sync_discover_install_button(self) -> None:

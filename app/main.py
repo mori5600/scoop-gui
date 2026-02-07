@@ -4,12 +4,8 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-try:
-    from .logging import init_logger
-    from .presentation.main_window import MainWindow
-except ImportError:
-    from app.logging import init_logger
-    from app.presentation.main_window import MainWindow
+from app.logging import init_logger
+from app.presentation.main_window import MainWindow
 
 
 def main() -> int:
