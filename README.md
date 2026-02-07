@@ -2,6 +2,10 @@
 
 Small Windows GUI for [Scoop](https://scoop.sh/) (Python + PySide6).
 
+
+<img width="1917" height="1027" alt="20260207_scoop_gui" src="https://github.com/user-attachments/assets/faeb6db6-aa68-422e-a796-15ca596d103f" />
+
+
 ## Features
 
 - View installed apps (via `scoop export`)
