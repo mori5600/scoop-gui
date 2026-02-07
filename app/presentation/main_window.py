@@ -25,6 +25,7 @@ class MainWindow(QMainWindow):
         self._busy = False
         self._installed_initial_sort_applied = False
         self._discover_splitter_polished = False
+        self._discover_columns_initialized = False
 
         self._installed_names: set[str] = set()
         self._pending_select_installed_name: str | None = None
@@ -143,8 +144,10 @@ class MainWindow(QMainWindow):
         hh = tv.horizontalHeader()
         hh.setStretchLastSection(True)
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        # `ResizeToContents` on every update gets expensive with large search result sets.
+        # Keep metadata columns interactive and fit them once per completed search.
+        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
 
         tv.setWordWrap(False)
         tv.setAlternatingRowColors(True)
@@ -152,6 +155,19 @@ class MainWindow(QMainWindow):
         tv.setSortingEnabled(True)
         tv.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         tv.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+        if not self._discover_columns_initialized:
+            tv.setColumnWidth(1, 120)
+            tv.setColumnWidth(2, 140)
+            self._discover_columns_initialized = True
+
+    def _fit_discover_metadata_columns(self) -> None:
+        """Fits metadata columns once after model updates."""
+        tv = self.ui.tableViewDiscover
+        for column, minimum, maximum in ((1, 90, 220), (2, 100, 260)):
+            tv.resizeColumnToContents(column)
+            width = tv.columnWidth(column)
+            tv.setColumnWidth(column, max(minimum, min(width, maximum)))
 
     def _setup_update_menu(self) -> None:
         """Adds a compact menu to the Update button (e.g. "Update all")."""
@@ -454,26 +470,25 @@ class MainWindow(QMainWindow):
 
     def on_search_loaded(self, results_obj: object) -> None:
         results = results_obj if isinstance(results_obj, list) else []
+        rows = [r for r in results if isinstance(r, ScoopSearchResult)]
 
         tv = self.ui.tableViewDiscover
         sorting_was_enabled = tv.isSortingEnabled()
         tv.setSortingEnabled(False)
+        tv.setUpdatesEnabled(False)
 
-        self.discover_model.setRowCount(0)
-        for r in results:
-            if not isinstance(r, ScoopSearchResult):
-                continue
-            self.discover_model.appendRow(
-                [
-                    QStandardItem(r.name),
-                    QStandardItem(r.version),
-                    QStandardItem(r.source),
-                    QStandardItem(r.binaries),
-                ]
-            )
+        try:
+            self.discover_model.setRowCount(len(rows))
+            for row, item in enumerate(rows):
+                self.discover_model.setItem(row, 0, QStandardItem(item.name))
+                self.discover_model.setItem(row, 1, QStandardItem(item.version))
+                self.discover_model.setItem(row, 2, QStandardItem(item.source))
+                self.discover_model.setItem(row, 3, QStandardItem(item.binaries))
 
-        tv.resizeColumnsToContents()
-        tv.setSortingEnabled(sorting_was_enabled)
+            self._fit_discover_metadata_columns()
+        finally:
+            tv.setUpdatesEnabled(True)
+            tv.setSortingEnabled(sorting_was_enabled)
 
         if self.discover_model.rowCount() > 0:
             tv.setCurrentIndex(self.discover_model.index(0, 0))

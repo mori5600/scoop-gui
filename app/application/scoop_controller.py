@@ -65,10 +65,14 @@ class ScoopController(QObject):
         # Under some hosts/versions the formatted table isn't captured reliably, so we
         # convert to a compact JSON payload explicitly for stable parsing.
         command = (
-            f"$items = @(scoop search {quoted} | ForEach-Object {{ "
-            '[pscustomobject]@{ Name = "$($_.Name)"; Version = "$($_.Version)"; '
-            'Source = "$($_.Source)"; Binaries = "$($_.Binaries)" } '
-            "}); "
+            f"$items = @(scoop search {quoted} | Select-Object "
+            "@{Name='Name';Expression={[string]$_.Name}},"
+            "@{Name='Version';Expression={[string]$_.Version}},"
+            "@{Name='Source';Expression={[string]$_.Source}},"
+            "@{Name='Binaries';Expression={"
+            "if ($_.Binaries -is [System.Array]) { ($_.Binaries -join ' ') } "
+            "else { [string]$_.Binaries }"
+            "}}); "
             "$items | ConvertTo-Json -Compress"
         )
         self._start_job(

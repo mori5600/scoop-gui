@@ -46,6 +46,24 @@ def test_parse_scoop_search_accepts_single_json_object() -> None:
     ]
 
 
+def test_parse_scoop_search_ignores_valuekind_objects() -> None:
+    text = (
+        '[{"Name":"sample-tool","Version":{"ValueKind":3},"Source":"sample-bucket",'
+        '"Binaries":["sample.exe","helper.exe"]}]'
+    )
+
+    results = parse_scoop_search(text)
+
+    assert results == [
+        ScoopSearchResult(
+            name="sample-tool",
+            version="",
+            source="sample-bucket",
+            binaries="sample.exe helper.exe",
+        )
+    ]
+
+
 def test_parse_scoop_search_fallback_parses_formatted_table() -> None:
     text = (
         "\x1b[33mResults from local buckets...\x1b[0m\r\n"

@@ -9,6 +9,29 @@ _ANSI_CSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 _ANSI_2CHAR_RE = re.compile(r"\x1b[@-Z\\-_]")
 
 
+def _coerce_text(value: object) -> str:
+    """Converts parsed JSON field values into plain display text."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float, bool)):
+        return str(value).strip()
+    if isinstance(value, list):
+        parts = []
+        for v in value:
+            text = _coerce_text(v)
+            if text:
+                parts.append(text)
+        return " ".join(parts).strip()
+    if isinstance(value, dict):
+        # PowerShell can serialize JsonElement-like values into only `ValueKind`.
+        if set(value.keys()) <= {"ValueKind"}:
+            return ""
+        return ""
+    return str(value).strip()
+
+
 def _sanitize(text: str) -> str:
     """Normalizes newlines and strips common ANSI escape sequences."""
     if not text:
@@ -40,13 +63,13 @@ def parse_scoop_search(text: str) -> list[ScoopSearchResult]:
 
             # Keys are capitalized by our PowerShell pipeline, but keep a small
             # fallback set for safety.
-            name = str(item.get("Name") or item.get("name") or "").strip()
+            name = _coerce_text(item.get("Name") or item.get("name") or "")
             if not name:
                 continue
 
-            version = str(item.get("Version") or item.get("version") or "").strip()
-            source = str(item.get("Source") or item.get("source") or "").strip()
-            binaries = str(item.get("Binaries") or item.get("binaries") or "").strip()
+            version = _coerce_text(item.get("Version") or item.get("version") or "")
+            source = _coerce_text(item.get("Source") or item.get("source") or "")
+            binaries = _coerce_text(item.get("Binaries") or item.get("binaries") or "")
 
             results.append(
                 ScoopSearchResult(
