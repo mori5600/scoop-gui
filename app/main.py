@@ -14,7 +14,7 @@ def main() -> int:
         logger.info("Starting application")
         app = QApplication(sys.argv)
         window = MainWindow()
-        window.show()
+        window.showMaximized()
         return app.exec()
     except KeyboardInterrupt:
         logger.info("Application interrupted by user")
