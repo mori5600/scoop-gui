@@ -39,6 +39,10 @@ class ScoopController(QObject):
         self._active_job_id = 0
         self._active_label = ""
         self._refresh_after_finish = False
+        self._search_thread: QThread | None = None
+        self._search_worker: SubprocessWorker | None = None
+        self._active_search_job_id = 0
+        self._active_search_label = ""
         logger.info("ScoopController initialized")
 
     def is_busy(self) -> bool:
@@ -60,27 +64,35 @@ class ScoopController(QObject):
             self.searched.emit([])
             return
 
+        if self._search_thread is not None:
+            self.log.emit("[info] search already running")
+            logger.warning(
+                f"Search rejected because another search is active: requested={q} active={self._active_search_label}"
+            )
+            return
+
         quoted = self._ps_quote(q)
-        # `scoop search` emits PowerShell objects and relies on default formatting.
-        # Under some hosts/versions the formatted table isn't captured reliably, so we
-        # convert to a compact JSON payload explicitly for stable parsing.
+        # Emit tab-separated rows to avoid JSON conversion overhead on large result sets.
         command = (
-            f"$items = @(scoop search {quoted} | Select-Object "
-            "@{Name='Name';Expression={[string]$_.Name}},"
-            "@{Name='Version';Expression={[string]$_.Version}},"
-            "@{Name='Source';Expression={[string]$_.Source}},"
-            "@{Name='Binaries';Expression={"
-            "if ($_.Binaries -is [System.Array]) { ($_.Binaries -join ' ') } "
-            "else { [string]$_.Binaries }"
-            "}}); "
-            "$items | ConvertTo-Json -Compress"
+            f"scoop search {quoted} | ForEach-Object {{ "
+            "$name = [string]$_.Name; "
+            "if ([string]::IsNullOrWhiteSpace($name)) { return }; "
+            "$version = [string]$_.Version; "
+            "$source = [string]$_.Source; "
+            "$binaries = if ($_.Binaries -is [System.Array]) { "
+            "($_.Binaries -join ' ') "
+            "} else { [string]$_.Binaries }; "
+            "$name = $name -replace \"`t\", \" \" -replace \"[\\r\\n]+\", \" \"; "
+            "$version = $version -replace \"`t\", \" \" -replace \"[\\r\\n]+\", \" \"; "
+            "$source = $source -replace \"`t\", \" \" -replace \"[\\r\\n]+\", \" \"; "
+            "$binaries = $binaries -replace \"`t\", \" \" -replace \"[\\r\\n]+\", \" \"; "
+            "Write-Output ($name + \"`t\" + $version + \"`t\" + $source + \"`t\" + $binaries) "
+            "}"
         )
-        self._start_job(
+        self._start_search_job(
             label=f"scoop search {q}",
             command=command,
-            on_finished=self._on_search_finished,
             timeout_sec=60,
-            announce=True,
         )
 
     def install_app(self, name: str) -> None:
@@ -153,10 +165,16 @@ class ScoopController(QObject):
             if self._refresh_after_finish:
                 self._refresh_after_finish = False
                 # Chain refresh without dropping the busy state in-between. This prevents
-                # other jobs (e.g. search) from stealing the slot and skipping refresh.
+                # other command jobs from stealing the slot and skipping refresh.
                 self.refresh_installed_apps()
                 return
             self.busy_changed.emit(False)
+
+    def _on_search_thread_finished(self, finished_thread: QThread) -> None:
+        """Clears references only if the finished thread is the active search one."""
+        if self._search_thread is finished_thread:
+            self._search_thread = None
+            self._search_worker = None
 
     @staticmethod
     def _decode(data: bytes) -> str:
@@ -244,6 +262,39 @@ class ScoopController(QObject):
         self._worker = worker
         thread.start()
 
+    def _start_search_job(self, label: str, command: str, timeout_sec: int) -> None:
+        self._active_search_job_id += 1
+        job_id = self._active_search_job_id
+        self._active_search_label = label
+        logger.info(
+            f"Starting search id={job_id} label={label} timeout={timeout_sec}s"
+        )
+
+        self.log.emit(f"$ {label}")
+        self.job_started.emit(label)
+
+        cmd = f"$ErrorActionPreference='Stop'; {command}; exit $LASTEXITCODE"
+        argv = build_powershell_argv(cmd)
+
+        thread = QThread()
+        worker = SubprocessWorker(argv=argv, timeout_sec=timeout_sec)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+
+        worker.finished.connect(
+            lambda stdout, stderr, returncode, jid=job_id: self._on_search_finished(
+                jid, stdout, stderr, returncode
+            )
+        )
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda t=thread: self._on_search_thread_finished(t))
+
+        self._search_thread = thread
+        self._search_worker = worker
+        thread.start()
+
     def _run_scoop_command(
         self,
         label: str,
@@ -313,9 +364,9 @@ class ScoopController(QObject):
     def _on_search_finished(
         self, job_id: int, stdout: bytes, stderr: bytes, returncode: int
     ) -> None:
-        if job_id != self._active_job_id:
+        if job_id != self._active_search_job_id:
             logger.warning(
-                f"Ignored stale search result: job_id={job_id} active_job_id={self._active_job_id}"
+                f"Ignored stale search result: job_id={job_id} active_job_id={self._active_search_job_id}"
             )
             return
 
@@ -324,39 +375,42 @@ class ScoopController(QObject):
 
         combined_clean = self._sanitize_output(out + "\n" + err).strip()
         if combined_clean:
-            # Avoid logging the JSON payload; keep log noise minimal for search.
             if "no matches found" in combined_clean.lower():
                 self.log.emit("WARN  No matches found.")
-                logger.warning(f"No matches found for search: {self._active_label}")
+                logger.warning(
+                    f"No matches found for search: {self._active_search_label}"
+                )
 
         if returncode != 0:
             # Scoop uses code=1 for "no matches found" (similar to grep).
             if "no matches found" in combined_clean.lower():
                 self.searched.emit([])
                 # Treat as a successful search completion for UX.
-                logger.info(f"Search completed with no results: {self._active_label}")
-                self.job_finished.emit(self._active_label, 0)
+                logger.info(
+                    f"Search completed with no results: {self._active_search_label}"
+                )
+                self.job_finished.emit(self._active_search_label, 0)
                 return
 
             err_clean = self._sanitize_output(err).strip()
             if err_clean:
                 self.log.emit(err_clean)
-                logger.error(f"stderr from {self._active_label}: {err_clean}")
+                logger.error(f"stderr from {self._active_search_label}: {err_clean}")
 
             logger.error(
-                f"Search command failed: label={self._active_label} code={returncode}"
+                f"Search command failed: label={self._active_search_label} code={returncode}"
             )
             self.error.emit(f"[error] scoop failed (code={returncode})")
             self.searched.emit([])
-            self.job_finished.emit(self._active_label, returncode)
+            self.job_finished.emit(self._active_search_label, returncode)
             return
 
         results = parse_scoop_search(out)
         self.searched.emit(results)
         logger.info(
-            f"Search completed: label={self._active_label} result_count={len(results)}"
+            f"Search completed: label={self._active_search_label} result_count={len(results)}"
         )
-        self.job_finished.emit(self._active_label, 0)
+        self.job_finished.emit(self._active_search_label, 0)
 
     def _on_command_finished(
         self,

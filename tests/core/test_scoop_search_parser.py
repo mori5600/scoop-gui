@@ -2,6 +2,30 @@ from app.core.scoop_search_parser import _sanitize, parse_scoop_search
 from app.core.scoop_types import ScoopSearchResult
 
 
+def test_parse_scoop_search_reads_tsv_rows() -> None:
+    text = (
+        "alpha-tool\t1.2.3\tbucket-a\talpha.exe\n"
+        "beta-archive\t\tbucket-b\tbeta.exe helper.exe\n"
+    )
+
+    results = parse_scoop_search(text)
+
+    assert results == [
+        ScoopSearchResult(
+            name="alpha-tool",
+            version="1.2.3",
+            source="bucket-a",
+            binaries="alpha.exe",
+        ),
+        ScoopSearchResult(
+            name="beta-archive",
+            version="",
+            source="bucket-b",
+            binaries="beta.exe helper.exe",
+        ),
+    ]
+
+
 def test_parse_scoop_search_reads_json_and_skips_rows_without_name() -> None:
     text = (
         "INFO: searching...\n"

@@ -43,15 +43,49 @@ def _sanitize(text: str) -> str:
     return text
 
 
+def _parse_tsv_line(line: str) -> ScoopSearchResult | None:
+    """Parses one tab-separated row emitted by the optimized search pipeline."""
+    if "\t" not in line:
+        return None
+
+    parts = [p.strip() for p in line.split("\t", maxsplit=3)]
+    if not parts:
+        return None
+
+    name = parts[0]
+    if not name:
+        return None
+
+    version = parts[1] if len(parts) >= 2 else ""
+    source = parts[2] if len(parts) >= 3 else ""
+    binaries = parts[3] if len(parts) >= 4 else ""
+
+    return ScoopSearchResult(
+        name=name,
+        version=version,
+        source=source,
+        binaries=binaries,
+    )
+
+
 def parse_scoop_search(text: str) -> list[ScoopSearchResult]:
     """Parses `scoop search` output into rows.
 
-    Preferred input is JSON emitted by an explicit `ConvertTo-Json` pipeline (more
-    stable across PowerShell versions). A formatted-table fallback is kept for
-    resilience.
+    Preferred input is tab-separated rows emitted by the optimized PowerShell
+    pipeline. JSON/table fallbacks are kept for resilience.
     """
     results: list[ScoopSearchResult] = []
+    text = _sanitize(text)
 
+    # ---- Preferred: tab-separated rows
+    for line in text.splitlines():
+        row = _parse_tsv_line(line.strip())
+        if row is not None:
+            results.append(row)
+    if results:
+        return results
+
+    # ---- Fallback: JSON payload
     data = extract_first_json_value(text)
     if isinstance(data, dict):
         data = [data]
@@ -82,7 +116,6 @@ def parse_scoop_search(text: str) -> list[ScoopSearchResult]:
         return results
 
     # ---- Fallback: parse formatted text table
-    text = _sanitize(text)
 
     for line in text.splitlines():
         s = line.strip()

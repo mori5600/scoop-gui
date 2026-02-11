@@ -16,6 +16,8 @@ from app.ui_generated.ui_MainWindow import Ui_MainWindow
 class MainWindow(QMainWindow):
     """Main application window."""
 
+    _DISCOVER_AUTO_FIT_MAX_ROWS = 250
+
     def __init__(self) -> None:
         super().__init__()
         self._busy = False
@@ -29,7 +31,6 @@ class MainWindow(QMainWindow):
         self._pending_switch_to_installed = False
 
         self._last_discover_query = ""
-        self._pending_discover_query: str | None = None
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -169,6 +170,13 @@ class MainWindow(QMainWindow):
     def _fit_discover_metadata_columns(self) -> None:
         """Fits metadata columns once after model updates."""
         tv = self.ui.tableViewDiscover
+        if self.discover_model.rowCount() > self._DISCOVER_AUTO_FIT_MAX_ROWS:
+            # `resizeColumnToContents` scans all rows and becomes expensive on very
+            # large result sets.
+            tv.setColumnWidth(1, 120)
+            tv.setColumnWidth(2, 140)
+            return
+
         for column, minimum, maximum in ((1, 90, 220), (2, 100, 260)):
             tv.resizeColumnToContents(column)
             width = tv.columnWidth(column)
@@ -237,18 +245,6 @@ class MainWindow(QMainWindow):
         if current is self.ui.tabDiscover:
             self._polish_discover_splitter_once()
             self.ui.lineEditDiscoverSearch.setFocus()
-
-            # If the user explicitly requested a search while a job was running,
-            # run it when the tab becomes visible and we're idle again.
-            if (
-                (not self._busy)
-                and self._pending_discover_query
-                and self._pending_discover_query
-                == self.ui.lineEditDiscoverSearch.text().strip()
-            ):
-                self.ui.labelDiscoverStatus.setText("Searching...")
-                self.scoop.search_apps(self._pending_discover_query)
-                self._pending_discover_query = None
         else:
             self.ui.lineEditSearch.setFocus()
 
@@ -418,7 +414,6 @@ class MainWindow(QMainWindow):
         click the Search button (or press Enter) to run the search explicitly.
         """
         query = self.ui.lineEditDiscoverSearch.text().strip()
-        self._pending_discover_query = None
 
         if len(query) < 2:
             self.ui.labelDiscoverStatus.setText(
@@ -440,7 +435,6 @@ class MainWindow(QMainWindow):
         query = self.ui.lineEditDiscoverSearch.text().strip()
         if len(query) < 2:
             self._last_discover_query = ""
-            self._pending_discover_query = None
             self.ui.labelDiscoverStatus.setText(
                 "Type at least 2 characters, then click Search"
             )
@@ -450,13 +444,6 @@ class MainWindow(QMainWindow):
             return
 
         self._last_discover_query = query
-
-        if self._busy:
-            self._pending_discover_query = query
-            self.ui.labelDiscoverStatus.setText("Busy... waiting to search")
-            return
-
-        self._pending_discover_query = None
         self.ui.labelDiscoverStatus.setText("Searching...")
         self.scoop.search_apps(query)
 
@@ -474,7 +461,11 @@ class MainWindow(QMainWindow):
 
         try:
             self.discover_model.set_results(rows)
-            if sort_section >= 0:
+            should_sort = sort_section >= 0 and not (
+                sort_section == 0
+                and sort_order == Qt.SortOrder.AscendingOrder
+            )
+            if should_sort:
                 self.discover_model.sort(sort_section, sort_order)
 
             self._fit_discover_metadata_columns()
@@ -563,18 +554,6 @@ class MainWindow(QMainWindow):
         self.ui.pushButtonUpdate.setEnabled(not busy)
         self.ui.pushButtonCleanup.setEnabled(not busy)
         self._sync_discover_install_button()
-
-        if not busy and self._pending_discover_query:
-            # Run a queued search after long-running jobs finish.
-            if self.ui.tabWidgetMain.currentWidget() is self.ui.tabDiscover:
-                # Keep the newest query only.
-                if (
-                    self._pending_discover_query
-                    == self.ui.lineEditDiscoverSearch.text().strip()
-                ):
-                    self.ui.labelDiscoverStatus.setText("Searching...")
-                    self.scoop.search_apps(self._pending_discover_query)
-                    self._pending_discover_query = None
 
     def on_job_started(self, label: str) -> None:
         self.statusBar().showMessage(f"Running: {label}")
