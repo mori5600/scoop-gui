@@ -15,11 +15,13 @@ class SubprocessWorker(QObject):
     """
 
     finished = Signal(bytes, bytes, int)
+    finished_with_job = Signal(int, bytes, bytes, int)
 
-    def __init__(self, argv: list[str], timeout_sec: int = 60):
+    def __init__(self, argv: list[str], timeout_sec: int = 60, job_id: int = 0):
         super().__init__()
         self._argv = argv
         self._timeout_sec = timeout_sec
+        self._job_id = job_id
 
     @Slot()
     def run(self):
@@ -39,10 +41,19 @@ class SubprocessWorker(QObject):
             result = subprocess.run(self._argv, **kwargs)
             logger.info(f"Subprocess finished returncode={result.returncode}")
             self.finished.emit(result.stdout, result.stderr, result.returncode)
+            self.finished_with_job.emit(
+                self._job_id, result.stdout, result.stderr, result.returncode
+            )
 
         except subprocess.TimeoutExpired:
             logger.warning("Subprocess timed out")
             self.finished.emit(b"", b"timeout: command exceeded limit", 124)
+            self.finished_with_job.emit(
+                self._job_id, b"", b"timeout: command exceeded limit", 124
+            )
         except Exception as e:
             logger.exception("Subprocess execution failed")
             self.finished.emit(b"", str(e).encode("utf-8", errors="replace"), 1)
+            self.finished_with_job.emit(
+                self._job_id, b"", str(e).encode("utf-8", errors="replace"), 1
+            )

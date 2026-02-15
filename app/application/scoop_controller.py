@@ -2,7 +2,7 @@ import re
 from typing import Callable
 
 from logly import logger
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 from app.core.scoop_export_parser import parse_scoop_export
 from app.core.scoop_search_parser import parse_scoop_search
@@ -26,6 +26,7 @@ class ScoopController(QObject):
     _ANSI_OSC_RE = re.compile(r"\x1b\][^\x07]*(?:\x07|\x1b\\)")
     _ANSI_CSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
     _ANSI_2CHAR_RE = re.compile(r"\x1b[@-Z\\-_]")
+    _MAX_APP_LOG_LINES = 80
 
     def __init__(self, parent: QObject | None = None):
         """Initializes the controller.
@@ -38,6 +39,7 @@ class ScoopController(QObject):
         self._worker: SubprocessWorker | None = None
         self._active_job_id = 0
         self._active_label = ""
+        self._active_refresh_after = False
         self._refresh_after_finish = False
         self._search_thread: QThread | None = None
         self._search_worker: SubprocessWorker | None = None
@@ -153,12 +155,12 @@ class ScoopController(QObject):
             timeout_sec=600,
         )
 
-    def _on_thread_finished(self, finished_thread: QThread) -> None:
-        """Clears references only if the finished thread is still the active one.
-
-        Args:
-            finished_thread: The thread that has emitted `finished`.
-        """
+    @Slot()
+    def _on_thread_finished(self) -> None:
+        """Clears references only if the finished thread is still the active one."""
+        finished_thread = self.sender()
+        if not isinstance(finished_thread, QThread):
+            return
         if self._thread is finished_thread:
             self._thread = None
             self._worker = None
@@ -170,8 +172,12 @@ class ScoopController(QObject):
                 return
             self.busy_changed.emit(False)
 
-    def _on_search_thread_finished(self, finished_thread: QThread) -> None:
+    @Slot()
+    def _on_search_thread_finished(self) -> None:
         """Clears references only if the finished thread is the active search one."""
+        finished_thread = self.sender()
+        if not isinstance(finished_thread, QThread):
+            return
         if self._search_thread is finished_thread:
             self._search_thread = None
             self._search_worker = None
@@ -209,7 +215,13 @@ class ScoopController(QObject):
         output = self._sanitize_output(text).rstrip()
         if output:
             self.log.emit(output)
-            for line in output.splitlines():
+            lines = output.splitlines()
+            if len(lines) > self._MAX_APP_LOG_LINES:
+                logger.info(
+                    f"[scoop] emitted {len(lines)} lines (showing first {self._MAX_APP_LOG_LINES})"
+                )
+                lines = lines[: self._MAX_APP_LOG_LINES]
+            for line in lines:
                 logger.info(f"[scoop] {line}")
 
     def _start_job(
@@ -219,6 +231,7 @@ class ScoopController(QObject):
         on_finished: Callable[[int, bytes, bytes, int], None],
         timeout_sec: int,
         announce: bool = True,
+        refresh_after: bool = False,
     ) -> None:
         if self._thread is not None:
             self.log.emit("[info] already running")
@@ -230,6 +243,7 @@ class ScoopController(QObject):
         self._active_job_id += 1
         job_id = self._active_job_id
         self._active_label = label
+        self._active_refresh_after = refresh_after
         self._refresh_after_finish = False
         logger.info(f"Starting job id={job_id} label={label} timeout={timeout_sec}s")
 
@@ -244,19 +258,15 @@ class ScoopController(QObject):
         argv = build_powershell_argv(cmd)
 
         thread = QThread()
-        worker = SubprocessWorker(argv=argv, timeout_sec=timeout_sec)
+        worker = SubprocessWorker(argv=argv, timeout_sec=timeout_sec, job_id=job_id)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
 
-        worker.finished.connect(
-            lambda stdout, stderr, returncode, jid=job_id: on_finished(
-                jid, stdout, stderr, returncode
-            )
-        )
+        worker.finished_with_job.connect(on_finished)
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(lambda t=thread: self._on_thread_finished(t))
+        thread.finished.connect(self._on_thread_finished)
 
         self._thread = thread
         self._worker = worker
@@ -264,10 +274,9 @@ class ScoopController(QObject):
 
     def _start_search_job(self, label: str, command: str, timeout_sec: int) -> None:
         self._active_search_job_id += 1
-        job_id = self._active_search_job_id
         self._active_search_label = label
         logger.info(
-            f"Starting search id={job_id} label={label} timeout={timeout_sec}s"
+            f"Starting search id={self._active_search_job_id} label={label} timeout={timeout_sec}s"
         )
 
         self.log.emit(f"$ {label}")
@@ -277,19 +286,19 @@ class ScoopController(QObject):
         argv = build_powershell_argv(cmd)
 
         thread = QThread()
-        worker = SubprocessWorker(argv=argv, timeout_sec=timeout_sec)
+        worker = SubprocessWorker(
+            argv=argv,
+            timeout_sec=timeout_sec,
+            job_id=self._active_search_job_id,
+        )
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
 
-        worker.finished.connect(
-            lambda stdout, stderr, returncode, jid=job_id: self._on_search_finished(
-                jid, stdout, stderr, returncode
-            )
-        )
+        worker.finished_with_job.connect(self._on_search_finished)
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(lambda t=thread: self._on_search_thread_finished(t))
+        thread.finished.connect(self._on_search_thread_finished)
 
         self._search_thread = thread
         self._search_worker = worker
@@ -305,10 +314,9 @@ class ScoopController(QObject):
         self._start_job(
             label=label,
             command=command,
-            on_finished=lambda jid, stdout, stderr, returncode, ra=refresh_after: (
-                self._on_command_finished(jid, stdout, stderr, returncode, ra)
-            ),
+            on_finished=self._on_command_finished,
             timeout_sec=timeout_sec,
+            refresh_after=refresh_after,
         )
 
     @staticmethod
@@ -316,6 +324,7 @@ class ScoopController(QObject):
         """Quotes a value for PowerShell single-quoted literals."""
         return "'" + value.replace("'", "''") + "'"
 
+    @Slot(int, bytes, bytes, int)
     def _on_export_finished(
         self, job_id: int, stdout: bytes, stderr: bytes, returncode: int
     ) -> None:
@@ -361,6 +370,7 @@ class ScoopController(QObject):
         logger.info(f"Loaded {len(apps)} installed packages")
         self.job_finished.emit(self._active_label, 0)
 
+    @Slot(int, bytes, bytes, int)
     def _on_search_finished(
         self, job_id: int, stdout: bytes, stderr: bytes, returncode: int
     ) -> None:
@@ -412,13 +422,13 @@ class ScoopController(QObject):
         )
         self.job_finished.emit(self._active_search_label, 0)
 
+    @Slot(int, bytes, bytes, int)
     def _on_command_finished(
         self,
         job_id: int,
         stdout: bytes,
         stderr: bytes,
         returncode: int,
-        refresh_after: bool,
     ) -> None:
         """Handles finished Scoop commands that are not `scoop export`."""
         if job_id != self._active_job_id:
@@ -441,7 +451,7 @@ class ScoopController(QObject):
             self.job_finished.emit(self._active_label, returncode)
             return
 
-        if refresh_after:
+        if self._active_refresh_after:
             self._refresh_after_finish = True
             logger.info(
                 f"Command succeeded and queued refresh: label={self._active_label}"

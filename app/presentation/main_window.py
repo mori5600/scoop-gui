@@ -34,6 +34,8 @@ class MainWindow(QMainWindow):
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.ui.plainTextEditLog.setUndoRedoEnabled(False)
+        self.ui.plainTextEditLog.setMaximumBlockCount(4000)
 
         self.ui.tabWidgetMain.currentChanged.connect(self.on_tab_changed)
 
